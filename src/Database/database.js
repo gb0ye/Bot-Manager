@@ -1,6 +1,13 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
+const client = new Pool({
+   connectionString: process.env.DB_CONNECTION_STRING,
+   ssl: {
+      rejectUnauthorized: false,
+   },
+});
+
 // Function to insert data into the "users" table
 async function insertUserData(
    chatId,
@@ -10,17 +17,7 @@ async function insertUserData(
    isBot,
    phonenumber
 ) {
-   const client = new Pool({
-      connectionString: process.env.DB_CONNECTION_STRING,
-      ssl: {
-         rejectUnauthorized: false,
-      },
-   });
-
    try {
-      // Connect to the database
-      await client.connect();
-
       // SQL query for insertion
       const query = `
       INSERT INTO users (chatId, username, firstname, lastname, isBot, phone)
@@ -43,34 +40,21 @@ async function insertUserData(
 
       // Log the inserted data
       console.log("Data inserted successfully:", result.rows[0]);
-   } catch (err) {
-      if (err.code === "23505") {
+   } catch (error) {
+      if (error.code === "23505") {
          console.log(
             "User with the same chat id already exists. Ignoring input."
          );
       } else {
-         console.error("Error occurred while inserting user:", err);
+         console.error("Error occurred while inserting user:", error);
       }
-   } finally {
-      // Disconnect from the database
-      await client.end();
    }
 }
 
 // Function to add a user to a group
 async function addUserToGroup(userChatId, groupId) {
-   const client = new Pool({
-      connectionString: process.env.DB_CONNECTION_STRING,
-      ssl: {
-         rejectUnauthorized: false,
-      },
-   });
-
    try {
-      await client.connect();
-
-      const query =
-         "INSERT INTO user_groups (user_id, group_id) VALUES ($1, $2)";
+      const query = "INSERT INTO user_groups (userid, groupid) VALUES ($1, $2)";
       const values = [userChatId, groupId];
 
       await client.query(query, values);
@@ -78,14 +62,38 @@ async function addUserToGroup(userChatId, groupId) {
       console.log("User added to group successfully!");
    } catch (error) {
       console.error("Error adding user to group:", error);
-   } finally {
-      await client.end();
    }
 }
 
-// Example usage
-addUserToGroup(123456789, 987654321);
+async function addGroupToDB(
+   groupId,
+   groupTitle,
+   dateAddedToGroup,
+   weatherAlerts,
+   invitedBy
+) {
+   try {
+      const query =
+         "INSERT INTO groups(groupId, groupTitle, dateAddedToGroup, weatherAlerts, invitedBy) VALUES ($1, $2, $3, $4, $5)";
+      const values = [
+         groupId,
+         groupTitle,
+         dateAddedToGroup,
+         weatherAlerts,
+         invitedBy,
+      ];
 
-// Example usage of the function
+      await client.query(query, values);
 
-module.exports = { insertUserData, addUserToGroup };
+      console.log("Group added to database successfully!");
+   } catch (error) {
+      if (error.code === "23505") {
+         console.log(
+            "Group with the same  groupId already exists. Ignoring input."
+         );
+      }
+      console.error("Error adding group to database:", error);
+   }
+}
+
+module.exports = { insertUserData, addUserToGroup, addGroupToDB };

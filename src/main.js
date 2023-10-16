@@ -1,6 +1,10 @@
 const { Api, TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
-const { insertUserData } = require("./Database/database");
+const {
+   insertUserData,
+   addUserToGroup,
+   addGroupToDB,
+} = require("./Database/database");
 require("dotenv").config();
 const { jsonParser } = require("./test");
 let csvResult = [];
@@ -17,22 +21,52 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
    await client.connect();
    console.log("You should now be connected.");
 
-   //    const r = await client.getEntity("-1921190464")
-   //    console.log(r)
+
+   // const result = await client.invoke(
+   //    new Api.channels.GetChannels({
+   //      id: ["1985564946"],
+   //    })
+   //  );
+   // const result = await client.getEntity("@primenze")
+   // console.log(result)
 
    await client.addEventHandler(async (event) => {
-      console.log(event);
+      // console.log(event);
       if (event.className === "UpdateChatParticipants") {
-         // console.log(event, "fffffffffffffff");
-         // console.log(event.participants.participants)
+         // console.log("ggggggggggggggg");
+         // console.log(event)
+         // console.log("fffffffffffffff");
       }
 
-      if (event.className === "UpdateNewMessage") {
-         console.log(event.message.peerId);
+      if (
+         event.className === "UpdateNewMessage" ||
+         event.className === "UpdateNewChannelMessage"
+      ) {
+         // console.log(event.message.peerId);
          if (event.message.action.className === "MessageActionChatAddUser") {
             for (const user of event.message.action.users) {
                if (user.value.toString() === process.env.AYOMIDE_ID) {
                   console.log("I was added to a group");
+                  const result = await client.invoke(
+                     new Api.messages.GetFullChat({
+                        //normally chat id for groups start with negative symbol but this doesn't require it
+                        chatId: BigInt(
+                           `${event.message.peerId.chatId.value.toString()}`
+                        ),
+                     })
+                  );
+                  const groupInfo = result.chats[0];
+                  const dateAdded = new Date(event.message.date * 1000)
+                     .toISOString()
+                     .replace("T", " ")
+                     .replace("Z", "");
+                  await addGroupToDB(
+                     groupInfo.id.value.toString(),
+                     groupInfo.title,
+                     dateAdded,
+                     true,
+                     event.message.fromId.userId.value.toString()
+                  );
                   client.sendMessage(
                      `-${event.message.peerId.chatId.toString()}`,
                      {
@@ -46,15 +80,17 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
          }
 
          const userData = [];
+         const groupId = event.message.peerId.chatId.value.toString();
          const result = await client.invoke(
             new Api.messages.GetFullChat({
                //normally chat id for groups start with negative symbol but this doesn't require it
                chatId: BigInt(
-                  `${event.message.peerId.chatId.value.toString()}`
+                  `${groupId}`
                ),
             })
          );
-         console.log(result);
+         console.log(result.users);
+
          const usersInfo = result.users;
          for (user of usersInfo) {
             const obj = {
@@ -66,7 +102,7 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
                "Date Of Birth": null,
             };
             userData.push(obj);
-            insertUserData(
+            await insertUserData(
                user.id.value.toString(),
                user.username,
                user.firstName,
@@ -74,10 +110,11 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
                user.bot,
                user.phone
             );
+            await addUserToGroup(user.id.value.toString(), groupId);
          }
+         console.log(userData);
       }
-      // console.log(userData);
-      const csvResult = await jsonParser(userData);
+      // const csvResult = await jsonParser(userData);
    });
 
    async function addUser(chatId, userId, fwdLimit) {
