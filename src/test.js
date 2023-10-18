@@ -1,5 +1,5 @@
 const { StreamParser } = require("@json2csv/plainjs");
-const fs = require("fs");
+
 const jsonParser = (obj) => {
    const parser = new StreamParser();
 

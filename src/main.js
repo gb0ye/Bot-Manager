@@ -1,5 +1,6 @@
 const { Api, TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
+const fs = require("fs");
 const {
    insertUserData,
    addUserToGroup,
@@ -7,6 +8,7 @@ const {
 } = require("./Database/database");
 require("dotenv").config();
 const { jsonParser } = require("./test");
+const { message } = require("telegram/client");
 let csvResult = [];
 
 const apiId = 24999139;
@@ -21,15 +23,47 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
    await client.connect();
    console.log("You should now be connected.");
 
+   const messages = await client.getMessages("-600277781", {
+      q: "Happy Birthday",
+      limit: 2000, // The maximum number of messages to retrieve
+    });
 
-   // const result = await client.invoke(
-   //    new Api.channels.GetChannels({
-   //      id: ["1985564946"],
+    
+
+   // Specify the start and end dates for the search
+   const startDate = new Date(Date.now() - (365 * 24 * 60 * 60 * 1000)); // One year ago
+       const endDate = new Date(); // Current date
+       client.getMessages()
+   
+       // Retrieve all messages from the group within the specified timeframe
+       const messages = await client.getChatHistory("-600277781", {
+         limit: 100, // Adjust the limit as per your needs
+         offsetDate: Math.floor(startDate.getTime() / 1000),
+         offsetId: 0,
+         addOffset: 0,
+         minId: 0,
+         maxId: 0,
+         hash: 0,
+      });
+      // const result = await client.invoke(
+      console.log(messages)
+   //    new Api.messages.SearchGlobal({
+   //       q: "birthday",
+   //       filter: new Api.InputMessagesFilterEmpty({}),
+   //       //   offsetRate: 43,
+   //       offsetPeer: "@gb0ye",
+   //       //   offsetId: 43,
+   //       limit: 100,
+   //       //   folderId: 43,
    //    })
-   //  );
-   // const result = await client.getEntity("@primenze")
-   // console.log(result)
+   // );
 
+   // console.log(result);
+   fs.writeFileSync("data.json", JSON.stringify(messages));
+   // result.messages.forEach((message) => {
+   //    console.log(message.message);
+   // });
+   //  }
    await client.addEventHandler(async (event) => {
       // console.log(event);
       if (event.className === "UpdateChatParticipants") {
@@ -84,9 +118,7 @@ const stringSession = new StringSession(process.env.SHESS); // fill this later w
          const result = await client.invoke(
             new Api.messages.GetFullChat({
                //normally chat id for groups start with negative symbol but this doesn't require it
-               chatId: BigInt(
-                  `${groupId}`
-               ),
+               chatId: BigInt(`${groupId}`),
             })
          );
          console.log(result.users);
